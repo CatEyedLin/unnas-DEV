@@ -16,6 +16,7 @@ using UnityEngine.UI;
 // show who's turn it is
 // show when it's your turn
 //++ lerp card postions
+// include symbol for earch color, for color blind people
 
 // remember, player can do a lot a dumb things, they will not be delicate with the game
 // fix knowen and expected issues, before public alpha 1
@@ -181,7 +182,7 @@ public class GameManager : MonoBehaviour
 
         //handle the rendering of player's hand
 
-        if (hand.Count > 1)
+        if (hand.Count > 1)  // this only needs to happen when the player's hand gets updated
         {
             for (int i = 0; i < hand.Count; i++)
             {
@@ -645,43 +646,6 @@ public class GameManager : MonoBehaviour
 
     //========================= GAME FUNCTIONS ===============================
 
-    public void Shuffle()
-    {
-        foreach (var i in deck)
-        {
-            oldDeck.Add(i);
-        }
-
-        for (int i = 0; i < deck.Count; i++)
-        {
-            int r = Random.Range(0, oldDeck.Count);
-
-            deck[i] = oldDeck[r];
-            oldDeck.RemoveAt(r);
-        }
-
-    }
-
-    public Sprite GetCardSprite(Card card)
-    {
-        chat.text += card.content.GetHashCode().ToString();
-        switch (card.color)
-        {
-            case Card.Colors.wild:
-                return wildSprites[card.content.GetHashCode()];
-            case Card.Colors.blue:
-                return blueSprites[card.content.GetHashCode()];
-            case Card.Colors.green:
-                return greenSprites[card.content.GetHashCode()];
-            case Card.Colors.red:
-                return redSprites[card.content.GetHashCode()];
-            case Card.Colors.yellow:
-                return yellowSprites[card.content.GetHashCode()];
-            default:
-                return wildSprites[card.content.GetHashCode()];
-        }
-    }
-
     public void requstCard()
     {
         switch (state)
@@ -806,6 +770,43 @@ public class GameManager : MonoBehaviour
         }
     }
 
+    public void Shuffle()
+    {
+        foreach (var i in deck)
+        {
+            oldDeck.Add(i);
+        }
+
+        for (int i = 0; i < deck.Count; i++)
+        {
+            int r = Random.Range(0, oldDeck.Count);
+
+            deck[i] = oldDeck[r];
+            oldDeck.RemoveAt(r);
+        }
+
+    }
+
+    public Sprite GetCardSprite(Card card)
+    {
+        chat.text += card.content.GetHashCode().ToString();
+        switch (card.color)
+        {
+            case Card.Colors.wild:
+                return wildSprites[card.content.GetHashCode()];
+            case Card.Colors.blue:
+                return blueSprites[card.content.GetHashCode()];
+            case Card.Colors.green:
+                return greenSprites[card.content.GetHashCode()];
+            case Card.Colors.red:
+                return redSprites[card.content.GetHashCode()];
+            case Card.Colors.yellow:
+                return yellowSprites[card.content.GetHashCode()];
+            default:
+                return wildSprites[card.content.GetHashCode()];
+        }
+    }
+
 
     float Remap(float value, float from1, float to1, float from2, float to2)
     {
@@ -816,4 +817,6 @@ public class GameManager : MonoBehaviour
     {
         Application.OpenURL(url);
     }
+
+
 }
