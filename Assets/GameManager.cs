@@ -1,28 +1,10 @@
-using System.Collections;
+﻿using System.Collections;
 using System.IO;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 
-
-
-//if playCard   // client/host -> all
-// also figure out locking, and make sure it locks when in game, setting to allow players to joni after starting
-//++ create wild's color selector
-// display other players and their card amounts - also show players in lobby creation
-//~ have a screen for players who have joined a lobby in creation
-// add a constant global connected to lobby icon in top right
-// when someone wins, give choice to lobby owner/host to end game or continue
-// show who's turn it is
-// show when it's your turn
-//++ lerp card postions
-// include symbol for earch color, for color blind people
-
-// remember, player can do a lot a dumb things, they will not be delicate with the game
-// fix knowen and expected issues, before public alpha 1
-//++ hide client id from github
-
-// clean up and untangle A BUNCH of this stuff code
 
 public class GameManager : MonoBehaviour
 {
@@ -59,8 +41,12 @@ public class GameManager : MonoBehaviour
 
     public enum gameStates { menu, hosting, clienting }
     public gameStates state = gameStates.hosting;
-    public enum subStates { waiting, turn, drawing }
-    public subStates subState = subStates.waiting;
+
+    public int playerTurnIndex;
+    public bool myTurn = false;
+
+    //public enum subStates { waiting, turn, drawing }
+    //public subStates subState = subStates.waiting;
 
     // lobby creation varibles
 
@@ -96,6 +82,8 @@ public class GameManager : MonoBehaviour
     public bool allowDrawing;
 
     // active in-game varibles
+    public bool joinedLobby;
+
     public bool directionOfPlay;
     public Card discard;
 
@@ -107,6 +95,9 @@ public class GameManager : MonoBehaviour
     public GameObject handCardPrefab;
     public GameObject handParent;
 
+    public Dictionary<long, int> usersCardCount = new Dictionary<long, int>();
+
+    public TextMeshProUGUI activePlayerList;
 
     Card.Colors color;
     Card.Contents content;
@@ -121,10 +112,10 @@ public class GameManager : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        var file = new StreamReader("Assets/discord data"); // hide client id from github 
-        var ApplicationID = System.Convert.ToInt64(file.ReadLine());
-        discord = new Discord.Discord(ApplicationID, (System.UInt64)Discord.CreateFlags.Default);
-        file.Close();
+        //var file = new StreamReader("Assets/discord data"); // hide client id from github 
+        //var ApplicationID = System.Convert.ToInt64(file.ReadLine());
+        discord = new Discord.Discord(974458702398636092, (System.UInt64)Discord.CreateFlags.Default);
+        //file.Close();
 
         activityManager = discord.GetActivityManager();
         lobbyManager = discord.GetLobbyManager();
@@ -152,10 +143,10 @@ public class GameManager : MonoBehaviour
         discord.RunCallbacks();
 
 
-        if (Input.GetKeyDown(KeyCode.Backslash)) { debugMenu.SetActive(!debugMenu.activeSelf); }
+        if (Input.GetKeyDown(KeyCode.Backslash)) { debugMenu.SetActive(!debugMenu.activeSelf); } //show hide debug menu
 
         if ((Input.GetKey(KeyCode.RightAlt) || (Input.GetKey(KeyCode.LeftAlt))) && Input.GetKeyDown(KeyCode.Return))
-        {
+        { //enter/exit full screen
             var maxSize = Screen.resolutions[Screen.resolutions.Length - 1];
             chat.text += maxSize.ToString();
             if (Screen.fullScreenMode != FullScreenMode.FullScreenWindow)
@@ -174,16 +165,20 @@ public class GameManager : MonoBehaviour
             }
 
             if (!joinedNetwork)
-            {
+            {  //join the lobby's network, after joining a lobby, MUST BE DONE AT LEAST 1 FRAME AFTER JOINING LOBBY, so it's here
                 InitNetworking(lobby.Id);
                 joinedNetwork = true;
             }
         }
 
-        //handle the rendering of player's hand
-
-        if (hand.Count > 1)  // this only needs to happen when the player's hand gets updated
+        if (gameScreen.activeInHierarchy)
         {
+            UpdateActivePlayerList();
+        }
+
+   
+        if (hand.Count > 1)  // this only needs to happen when the player's hand gets updated
+        { //handle the rendering of player's hand
             for (int i = 0; i < hand.Count; i++)
             {
                 //y = -180 normal height = 120 max_x = 200
@@ -214,41 +209,53 @@ public class GameManager : MonoBehaviour
     //======================= NETWORK FUNCTIONS =============================== 
 
     private void OnNetworkMessage(long lobbyId, long userId, byte channelId, byte[] data)
-    {
+    { //handle all of the NetMsgs
+
         chat.text += "msg:" + System.Text.Encoding.UTF8.GetString(data) + "\n";
 
-        var inText = System.Text.Encoding.UTF8.GetString(data);
+        var inText = System.Text.Encoding.UTF8.GetString(data); // convert in data back to str, this is network expensive, but an easy way to handle this 
 
-        if (inText == "start game") // host -> client
-        {
+        if (inText.StartsWith("start game")) // host -> client
+        {  // when a client recives the msg from host to start game
             joiningScreen.SetActive(false);
             topMenu.SetActive(false);
             gameScreen.SetActive(true);
+
+            inText = inText.Remove(0, "start game".Length);
+            var vals = inText.Split("-".ToCharArray());
+            for (int i = 0; i < System.Int32.Parse(vals[0]); i++)
+            { // draw starting cards
+                requstCard();               
+            }        
+
         }
 
-        if (inText == "requst card")  //client -> host
-        {
+        if (inText == "requst card")  //client -> host + minor client
+        { //client asking for a card
+            usersCardCount[userId]++;
             //pull card from random postion in deck
-
-            if (deck.Count == 0)
+            if (state == gameStates.hosting)
             {
-                foreach (var card in discardedDeck)
+                if (deck.Count == 0)
                 {
-                    deck.Add(card);
+                    foreach (var card in discardedDeck)
+                    {
+                        deck.Add(card);
+                    }
+                    discardedDeck.Clear();
                 }
-                discardedDeck.Clear();
+
+                var i = Random.Range(0, deck.Count);
+                Card drawenC = deck[i];
+                deck.RemoveAt(i);
+
+                lobbyManager.SendNetworkMessage(lobby.Id, userId, 0, System.Text.Encoding.UTF8.GetBytes("drawnen = " + drawenC.ToSending()));
+                chat.text += "sent requsted card\n";
             }
-
-            var i = Random.Range(0, deck.Count);
-            Card drawenC = deck[i];
-            deck.RemoveAt(i);
-
-            lobbyManager.SendNetworkMessage(lobby.Id, userId, 0, System.Text.Encoding.UTF8.GetBytes("drawnen = " + drawenC.ToSending()));
-            chat.text += "sent requsted card\n";
 
         }
         if (inText.StartsWith("drawnen = ")) //host -> client
-        {
+        { //host returning drawen card
             inText = inText.Remove(0, "drawnen = ".Length);
             var vals = inText.Split(":".ToCharArray());
             Card drawenC = new Card();
@@ -260,6 +267,7 @@ public class GameManager : MonoBehaviour
 
         if (inText.StartsWith("play card = ")) //any -> all
         {
+            usersCardCount[userId]--;
             inText = inText.Remove(0, "play card = ".Length);
             var vals = inText.Split(":".ToCharArray());
             // Card playedC = new Card();
@@ -277,7 +285,7 @@ public class GameManager : MonoBehaviour
             }
         }
         if (inText.StartsWith("selected color ="))
-        {
+        { //when anyone uses the color picker after playing a wild
             inText = inText.Remove(0, "selected color =".Length);
             discard.color = (Card.Colors)System.Enum.Parse(typeof(Card.Colors), inText);
             discard.img.sprite = GetCardSprite(discard);
@@ -286,9 +294,10 @@ public class GameManager : MonoBehaviour
         // }
     }
     private void OnActivityJoin(string secret)
-    {
+    { //clicking on the join button on an invite
         if (state == gameStates.menu)
         {
+            myTurn = false;
             //var lobbyManager = discord.GetLobbyManager();
             chat.text += "OnActivityJoin:" + secret + "\n";
             lobbyManager.ConnectLobbyWithActivitySecret(secret, (Discord.Result result, ref Discord.Lobby tempLobby) =>
@@ -300,14 +309,14 @@ public class GameManager : MonoBehaviour
                     activity = new Discord.Activity
                     {
                         State = "Lobby Joiner",
-                        Details = "123 det",
+                        Details = "123",
                         Secrets = {
-                            Match = "matchSecret",
+                            Match = "matchSecret",  //do i need this?
                             Join = lobbyManager.GetLobbyActivitySecret(lobby.Id)
                         },
                         Party = {
                             Id = lobby.Id.ToString(),
-                            Size = {CurrentSize = 2, MaxSize = 10 }
+                            Size = {CurrentSize = 2, MaxSize = 10 } //i think discord ingonores currentSize now
                         }
                     };
                     activityManager.UpdateActivity(activity, (result => { chat.text += "OnActivityJoin-UpdateActivity" + result.ToString() + "\n"; }));
@@ -318,6 +327,7 @@ public class GameManager : MonoBehaviour
                     topMenu.SetActive(false);
                     joinScreen.SetActive(false);
                     joiningScreen.SetActive(true);
+                    joinedLobby = true;
 
                 }
             });
@@ -325,7 +335,7 @@ public class GameManager : MonoBehaviour
     }
 
     private void OnMemberConnect(long lobbyId, long userId)
-    {
+    { //when someone else joins the lobby
         chat.text += "OnMemberConnect:" + lobbyId.ToString() + "|||" + userId.ToString() + (lobbyId == lobby.Id).ToString() + "\n";
         if (lobbyId == lobby.Id)
         {
@@ -347,7 +357,7 @@ public class GameManager : MonoBehaviour
     }
 
     public void CreateLobby()
-    {
+    { //clicking the create lobby button, just do basic setup for a lobby, and set state to hosting
         if (lobby.Id != 0)
         {
             lobbyManager.DisconnectNetwork(lobby.Id);
@@ -373,7 +383,7 @@ public class GameManager : MonoBehaviour
             activity = new Discord.Activity
             {
                 State = "Lobby owner",
-                Details = "",
+                Details = "Version: alpha dev",
                 Secrets = {
                 Match = "matchSecret",
                 Join = lobbyManager.GetLobbyActivitySecret(lobby.Id)},
@@ -426,7 +436,7 @@ public class GameManager : MonoBehaviour
         activityManager.UpdateActivity(activity, (result => { chat.text += "LobbyCreationScreenUpdate-UpdateActivity" + result.ToString() + "\n"; }));
     }
 
-    public void SendLobbyNetworkMessage()
+    public void SendLobbyNetworkMessage() // leggacy i think
     { // Say hello!
         for (int i = 0; i < lobbyManager.MemberCount(lobby.Id); i++)
         {
@@ -453,7 +463,7 @@ public class GameManager : MonoBehaviour
         // We're ready to go!
     }
     public void quitSafely()
-    {
+    { // try to leave the net and lobby, don't think it works 100%
         lobbyManager.DisconnectNetwork(lobby.Id);
         lobbyManager.DisconnectLobby(lobby.Id, (result) => { Debug.Log(result); });
         activityManager.ClearActivity((result) => { Debug.Log(result); });
@@ -462,12 +472,18 @@ public class GameManager : MonoBehaviour
 
     //========================= MIX FUNCTIONS ===============================
     public void StartGame()
-    {
+    { // host function, when moving from game/lobby setup to the game proper
+      // tell all clents the game is starting and the **********ADD THE RULES TO NETMSG***************
+      // create deck of cards and play starting card
+        myTurn = true;
         for (int ui = 0; ui < lobbyManager.MemberCount(lobby.Id); ui++)
         {
             var userId = lobbyManager.GetMemberUserId(lobby.Id, ui);
             chat.text += "SendNetworkMessage to:" + userId.ToString() + " in lobby:" + lobby.Id.ToString() + "\n";
-            lobbyManager.SendNetworkMessage(lobby.Id, userId, 0, System.Text.Encoding.UTF8.GetBytes("start game"));
+            lobbyManager.SendNetworkMessage(lobby.Id, userId, 0, System.Text.Encoding.UTF8.GetBytes("start game-"+ startingCards.ToString()));
+
+            //usersCardCount[userId] = startingCards;   don't update here, as this int[] will update as clients draw cards, when recived start game NetMsg
+            chat.text += userId.ToString() + "\n";
         }
 
         //create deck of cards
@@ -480,7 +496,7 @@ public class GameManager : MonoBehaviour
                 {
                     case 0:
                         color = Card.Colors.wild;
-                        Debug.Log("wild");
+                        //Debug.Log("wild");
                         break;
                     case 1:
                         color = Card.Colors.blue;
@@ -604,7 +620,7 @@ public class GameManager : MonoBehaviour
                         deck.Add(new Card());
                         deck[cId].color = color;
                         deck[cId].content = content;
-                        Debug.Log(deck[cId].ToString());
+                       // Debug.Log(deck[cId].ToString());
                         cId++;
                     }
                 }
@@ -616,7 +632,7 @@ public class GameManager : MonoBehaviour
                         deck[cId].color = color;
                         deck[cId].content = Card.Contents.wild;
 
-                        Debug.Log(deck[cId].ToString());
+                      //  Debug.Log(deck[cId].ToString());
                         cId++;
                     }
                     for (int l = 0; l < 4; l++)
@@ -625,7 +641,7 @@ public class GameManager : MonoBehaviour
                         deck[cId].color = color;
                         deck[cId].content = Card.Contents.wildDrawFour;
 
-                        Debug.Log(deck[cId].ToString());
+                    //    Debug.Log(deck[cId].ToString());
                         cId++;
                     }
                 }
@@ -640,12 +656,62 @@ public class GameManager : MonoBehaviour
         deck.RemoveAt(r);
         discard.color = drawenC.color;
         discard.content = drawenC.content;
-        discard.img.sprite = GetCardSprite(discard);
+        //discard.img.sprite = GetCardSprite(discard);
+
+        foreach (var user in lobbyManager.GetMemberUsers(lobby.Id))
+        {
+        }
+    }
+    /// <summary>
+    /// update the list of all players, the number of cards in thier hand, and whoose turn it is
+    /// TODO: add players' PFP
+    /// </summary>
+    public void UpdateActivePlayerList()
+    { 
+        var newText = "";
+
+        var i = -1;
+        foreach (var user in lobbyManager.GetMemberUsers(lobby.Id))
+        {
+            i++;
+            if (playerTurnIndex == i)
+            {
+                newText += "<color=yellow>►";
+            }
+            else { newText += "<color=white> "; }
+
+            if (user.Id == discord.GetUserManager().GetCurrentUser().Id)
+            {
+                newText += "<b> ";
+            }
+
+            chat.text += user.Id.ToString() + "\n";
+            newText += user.Username + ": " + usersCardCount[user.Id].ToString() + "\n";  // can't pull card count??????
+
+
+            if (user.Id == discord.GetUserManager().GetCurrentUser().Id)
+            {
+                newText += "</b> ";
+            }
+        }
+        activePlayerList.SetText(newText);
+        Debug.Log(newText);
+    }
+    /// <summary>
+    /// end your turn and send it to the next player based on dir of play
+    /// </summary>
+    public void PassTurn() {
+        myTurn = false;
+      //  lobbyManager.GetMemberUserId(lobby.Id, self)
     }
 
 
     //========================= GAME FUNCTIONS ===============================
 
+    /// <summary>
+    /// basicly for when a player(Host or Client) wants to draw a card, 
+    /// ie. clicking on the deck, or previuos player played a +2
+    /// </summary>
     public void requstCard()
     {
         switch (state)
@@ -655,7 +721,7 @@ public class GameManager : MonoBehaviour
                 {
                     foreach (var card in discardedDeck)
                     {
-                        deck.Add(card);
+                        deck.Add(card);  // make sure to set wilds back to wild
                     }
                     discardedDeck.Clear();
                 }

@@ -1,0 +1,42 @@
+
+/*
+
+if playCard   // client/host -> all
+also figure out locking, and make sure it locks when in game, setting to allow players to joni after starting
+++ create wild's color selector
+display other players and their card amounts - also show players in lobby creation
+~ have a screen for players who have joined a lobby in creation
+add a constant global connected to lobby icon in top right
+when someone wins, give choice to lobby owner/host to end game or continue
+++ lerp card postions
+include symbol for earch color, for color blind people
+
+remember, player can do a lot a dumb things, they will not be delicate with the game
+fix knowen and expected issues, before public alpha 1
+++ hide client id from github
+
+clean up and untangle A BUNCH of this stuff code
+
+
+======== 
+turn order:
+    only alow you to play when it's your turn
+    pass turn to next player, upon succsessful ending action
+    show when it's your turn
+    show who's turn it is
+    implemt turn timer
+
+
+Show other players and thier card amount:
+    low player count (Undefined): - todo later for a nicer look
+
+    high player count (Undefined):
+        show player list on left side
+        show card count next to it in a folloing colloum
+        show whose turn it is
+
+    very high player count (Undefined):
+        same as high player count, but on split between left and right
+        
+
+*/
