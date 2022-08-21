@@ -40,3 +40,22 @@ Show other players and thier card amount:
         
 
 */
+
+add update checker, if possable
+
+
+should this be open source, i'm giving hackers a window to "how to cheat"?
+but there's no decated servers, to enforce anti-cheat,
+so it have to be spider-web anti cheat, every instance checking each other,
+which gives them x-ray, the best might be host based anti cheat,
+but then you have to trust the host
+
+anti-cheat idea:
+    every card is given a unique, random, ID, when creating the deck
+when playing a card, the host checks if that card, with that ID exists
+clients, can... check to make...-- no this for clients, and if someone mainy
+host plays a card with a miss matched UID and card C&#, calls them out for
+cheating
+
+
+randomly seeded? seed set to everyone

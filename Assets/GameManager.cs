@@ -223,10 +223,19 @@ public class GameManager : MonoBehaviour
 
             inText = inText.Remove(0, "start game".Length);
             var vals = inText.Split("-".ToCharArray());
-            for (int i = 0; i < System.Int32.Parse(vals[0]); i++)
-            { // draw starting cards
-                requstCard();               
-            }        
+
+            for (int ui = 0; ui < lobbyManager.MemberCount(lobby.Id); ui++)  //set every player's local card count to 0
+            {
+                var userId_ = lobbyManager.GetMemberUserId(lobby.Id, ui);
+                usersCardCount[userId_] = 0;
+                chat.text += userId_.ToString() + "\n";
+            }
+
+            /////// run a seprate function for both client and host when starting a game???? maybe, but host won't have to update rule settings
+            //for (int i = 0; i < System.Int32.Parse(vals[0]); i++)
+            // { // draw starting cards
+            //     requstCard();               
+            // }        
 
         }
 
@@ -482,7 +491,8 @@ public class GameManager : MonoBehaviour
             chat.text += "SendNetworkMessage to:" + userId.ToString() + " in lobby:" + lobby.Id.ToString() + "\n";
             lobbyManager.SendNetworkMessage(lobby.Id, userId, 0, System.Text.Encoding.UTF8.GetBytes("start game-"+ startingCards.ToString()));
 
-            //usersCardCount[userId] = startingCards;   don't update here, as this int[] will update as clients draw cards, when recived start game NetMsg
+            usersCardCount[userId] = 0; // don't update here, as this int[] will update as clients draw cards, when recived start game NetMsg
+            //^ set every player's local card count to 0
             chat.text += userId.ToString() + "\n";
         }
 
@@ -686,7 +696,7 @@ public class GameManager : MonoBehaviour
             }
 
             chat.text += user.Id.ToString() + "\n";
-            newText += user.Username + ": " + usersCardCount[user.Id].ToString() + "\n";  // can't pull card count??????
+            newText += user.Username + ": " + usersCardCount[user.Id].ToString() + "\n";  // can't pull card count... on clinet??????
 
 
             if (user.Id == discord.GetUserManager().GetCurrentUser().Id)
@@ -714,6 +724,13 @@ public class GameManager : MonoBehaviour
     /// </summary>
     public void requstCard()
     {
+        for (int i = 0; i < lobbyManager.MemberCount(lobby.Id); i++)
+        {
+            var userId = lobbyManager.GetMemberUserId(lobby.Id, i);
+            chat.text += "SendNetworkMessage to:" + userId.ToString() + " in lobby:" + lobby.Id.ToString() + "\n";
+            lobbyManager.SendNetworkMessage(lobby.Id, userId, 0, System.Text.Encoding.UTF8.GetBytes("requst card"));
+        }
+
         switch (state)
         {
             case gameStates.hosting:
@@ -731,7 +748,6 @@ public class GameManager : MonoBehaviour
                 DrawCard(drawenC);
                 break;
             case gameStates.clienting:
-                lobbyManager.SendNetworkMessage(lobby.Id, lobby.OwnerId, 0, System.Text.Encoding.UTF8.GetBytes("requst card"));
                 chat.text += "requsted card\n";
                 break;
             default:
@@ -770,6 +786,7 @@ public class GameManager : MonoBehaviour
         }
 
         hand.Insert(highestPos, newCard);
+        usersCardCount[discord.GetUserManager().GetCurrentUser().Id]++;
 
 
     }
@@ -790,6 +807,7 @@ public class GameManager : MonoBehaviour
                     //hand.Remove(cardObj);
                 }
                 hand.RemoveAt(hand.IndexOf(cardObj));
+                usersCardCount[discord.GetUserManager().GetCurrentUser().Id]--;
 
                 card.wantedAnchoredPosition = discard.wantedAnchoredPosition;
                 card.wantedEulerAngles = Vector3.zero;
