@@ -55,7 +55,10 @@ anti-cheat idea:
 when playing a card, the host checks if that card, with that ID exists
 clients, can... check to make...-- no this for clients, and if someone mainy
 host plays a card with a miss matched UID and card C&#, calls them out for
-cheating
+cheating 
 
 
 randomly seeded? seed set to everyone
+
+
+git test
